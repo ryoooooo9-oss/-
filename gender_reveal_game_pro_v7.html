@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>性別発表ミニゲーム</title>
+<style>
+  :root{
+    --bg1:#fff3f6; --bg2:#f7d6df; --ink:#2b2b2b;
+    --pink:#e98aa4; --pink2:#ffb6c8; --blue:#7fb3d6;
+    --card:rgba(255,255,255,.84); --shadow:0 18px 50px rgba(0,0,0,.12);
+  }
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);
+    background:radial-gradient(1200px 700px at 30% 10%, var(--bg1), var(--bg2));}
+  .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .card{width:min(560px, 94vw); background:var(--card); backdrop-filter: blur(10px);
+        border:1px solid rgba(255,255,255,.55); border-radius:22px; box-shadow:var(--shadow); overflow:hidden; position:relative;}
+  header{padding:16px 18px 10px; display:flex; gap:12px; align-items:flex-start; justify-content:space-between;}
+  .title{font-weight:950; letter-spacing:.02em; font-size:18px;}
+  .sub{font-size:12px; opacity:.80; margin-top:4px; line-height:1.55;}
+  .hud{display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;}
+  .pill{background:rgba(255,255,255,.78); border:1px solid rgba(255,255,255,.85); padding:8px 10px; border-radius:999px; font-size:12px;}
+  .pill b{font-size:14px;}
+  .toggle{display:flex; align-items:center; gap:8px; user-select:none;}
+  .toggle input{width:18px;height:18px;}
+  .stage{
+    height:720px; width:100%;
+    position:relative;
+    background:linear-gradient(180deg, rgba(255,255,255,.40), rgba(255,255,255,.10));
+    touch-action:manipulation;
+  }
+  .footer{padding:12px 18px 16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;}
+  button{
+    appearance:none; border:0; border-radius:14px; padding:12px 14px; font-weight:950; cursor:pointer;
+    background:linear-gradient(135deg, var(--pink), var(--pink2)); color:#fff; box-shadow:0 12px 26px rgba(233,138,164,.35);
+  }
+  button.secondary{background:rgba(255,255,255,.80); color:var(--ink); box-shadow:none; border:1px solid rgba(255,255,255,.92);}
+  .hint{font-size:12px; opacity:.82; line-height:1.55;}
+  .overlay{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:18px;
+    background:radial-gradient(900px 540px at 50% 25%, rgba(255,255,255,.92), rgba(255,255,255,.65));
+    z-index:20;
+  }
+  .overlay.hidden{display:none;}
+  .modal{
+    width:min(460px, 92vw); background:rgba(255,255,255,.92); border:1px solid rgba(255,255,255,.80);
+    border-radius:22px; box-shadow:var(--shadow); padding:18px 18px 16px; text-align:center;
+  }
+  .modal h2{margin:6px 0 6px; font-size:22px;}
+  .modal p{margin:8px 0; line-height:1.75;}
+  .big{font-size:40px; font-weight:1000; letter-spacing:.04em; margin:10px 0;}
+  .tiny{font-size:12px; opacity:.78;}
+  .row{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px;}
+
+  /* Falling characters */
+  .drop{
+    position:absolute;
+    top:-90px;
+    font-size:54px;
+    user-select:none;
+    will-change:transform, filter;
+    filter: drop-shadow(0 10px 16px rgba(0,0,0,.12));
+    transform: translateY(0);
+    animation: fall linear forwards;
+  }
+  .drop .label{
+    display:block;
+    text-align:center;
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:.10em;
+    margin-top:-6px;
+    opacity:.90;
+  }
+  .drop.girl .label{ color: rgba(233,138,164,.9); }
+  .drop.boy  .label{ color: rgba(127,179,214,.95); }
+
+  @keyframes fall{
+    from{ transform: translateY(0) rotate(-2deg); }
+    to  { transform: translateY(840px) rotate(2deg); }
+  }
+
+  /* Screen feedback */
+  .shake{ animation: shake 240ms ease-in-out; }
+  @keyframes shake{
+    0%{ transform: translateX(0); }
+    25%{ transform: translateX(-10px); }
+    50%{ transform: translateX(10px); }
+    75%{ transform: translateX(-8px); }
+    100%{ transform: translateX(0); }
+  }
+
+  /* Progress bar */
+  .barWrap{width:170px; height:10px; border-radius:999px; background:rgba(43,43,43,.12); overflow:hidden; display:inline-block; vertical-align:middle;}
+  .bar{height:100%; width:0%; background:linear-gradient(90deg, rgba(233,138,164,.95), rgba(255,182,200,.95)); border-radius:999px;}
+
+  /* Reveal suspense FX */
+  .revealStage{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(900px 540px at 50% 25%, rgba(255,255,255,.92), rgba(255,255,255,.65));
+    z-index:30;
+  }
+  .revealBox{
+    width:min(460px, 92vw);
+    background:rgba(255,255,255,.92);
+    border:1px solid rgba(255,255,255,.82);
+    border-radius:22px;
+    box-shadow:var(--shadow);
+    padding:18px 18px 16px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .shimmer{
+    position:absolute; inset:-60px; background:linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,.45) 50%, rgba(255,255,255,0) 65%);
+    transform:translateX(-55%);
+    animation: shimmer 1.25s ease-in-out infinite;
+    pointer-events:none;
+  }
+  @keyframes shimmer{
+    0%{ transform:translateX(-60%); opacity:.35; }
+    45%{ opacity:.55; }
+    100%{ transform:translateX(60%); opacity:.35; }
+  }
+  .flash{
+    position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none;
+  }
+  .flash.on{ animation: flash 320ms ease-out; }
+  @keyframes flash{
+    0%{opacity:0;}
+    40%{opacity:.9;}
+    100%{opacity:0;}
+  }
+
+  /* Envelope animation */
+  .envWrap{width:260px; height:170px; margin:10px auto 0; position:relative;}
+  .env{
+    position:absolute; inset:0; border-radius:18px;
+    background:linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.70));
+    border:1px solid rgba(255,255,255,.86);
+    box-shadow:0 18px 40px rgba(0,0,0,.10);
+    overflow:hidden;
+  }
+  .env:before{
+    content:""; position:absolute; left:0; right:0; top:0; bottom:0;
+    background:linear-gradient(135deg, rgba(233,138,164,.14), rgba(127,179,214,.12));
+  }
+  .envBottom{
+    position:absolute; left:-10%; right:-10%; bottom:-40%;
+    height:120%;
+    background:rgba(255,255,255,.55);
+    transform: rotate(45deg);
+    opacity:.45;
+  }
+  .flap{
+    position:absolute; left:0; right:0; top:0; height:56%;
+    background:linear-gradient(180deg, rgba(255,255,255,.90), rgba(255,255,255,.55));
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    transform-origin: 50% 0%;
+    transform: rotateX(0deg);
+    transition: transform 700ms cubic-bezier(.2,.9,.1,1), filter 700ms;
+    filter: drop-shadow(0 10px 12px rgba(0,0,0,.08));
+  }
+  .seal{
+    position:absolute; left:50%; top:56%; transform:translate(-50%,-50%);
+    width:38px; height:38px; border-radius:999px;
+    background:radial-gradient(circle at 35% 35%, rgba(255,255,255,.9), rgba(233,138,164,.95));
+    box-shadow:0 10px 22px rgba(233,138,164,.30);
+    border:1px solid rgba(255,255,255,.78);
+  }
+  .seal:after{
+    content:"🌸"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:18px;
+  }
+  .letter{
+    position:absolute; left:10%; right:10%; bottom:10%;
+    height:74%;
+    background:rgba(255,255,255,.92);
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.86);
+    transform: translateY(52%);
+    transition: transform 900ms cubic-bezier(.15,.9,.15,1);
+    box-shadow:0 14px 26px rgba(0,0,0,.08);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:950; letter-spacing:.08em; font-size:16px;
+    color:rgba(43,43,43,.78);
+  }
+  .envWrap.open .flap{ transform: rotateX(160deg); filter: drop-shadow(0 4px 8px rgba(0,0,0,.06)); }
+  .envWrap.open .letter{ transform: translateY(-2%); }
+
+  /* Countdown / reveal text */
+  .countText{
+    font-weight:950; letter-spacing:.08em; font-size:34px; margin:10px 0 0;
+    min-height:44px;
+  }
+  .miniText{font-size:12px; opacity:.78; line-height:1.6; margin-top:6px; min-height:38px;}
+
+  /* Sakura petals */
+  .sakuras{ position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .pet{
+    position:absolute; top:-40px; font-size:26px; opacity:0.9;
+    animation: petFall linear forwards;
+    filter: drop-shadow(0 8px 12px rgba(0,0,0,.08));
+  }
+  @keyframes petFall{
+    to{ transform: translateY(860px) rotate(90deg); opacity:0.95; }
+  }
+
+  /* Typewriter for final line */
+  .typeLine{
+    display:inline-block;
+    border-right: 2px solid rgba(255,255,255,.85);
+    white-space:nowrap;
+    overflow:hidden;
+    animation: caret 700ms steps(1) infinite;
+  }
+  @keyframes caret{ 50%{ border-color: transparent; } }
+
+  .finalText{
+    font-size:44px;
+    font-weight:1000;
+    letter-spacing:.06em;
+    margin-top:8px;
+    color:#fff;
+    text-shadow: 0 12px 28px rgba(0,0,0,.18);
+  }
+  .finalBG{
+    background:linear-gradient(135deg, rgba(233,138,164,.92), rgba(255,182,200,.92));
+  }
+  .revealBox.final{
+    color:#fff;
+    border-color: rgba(255,255,255,.65);
+    box-shadow: 0 22px 56px rgba(233,138,164,.20);
+  }
+  .revealBox.final .miniText{ opacity:.92; }
+  .revealBox.final .shimmer{ opacity:.55; }
+  .revealButtons{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="card">
+    <header>
+      <div>
+        <div class="title">性別発表ミニゲーム</div>
+        <div class="sub">
+          落ちてくる <b style="color:rgba(233,138,164,.95)">👧 女の子</b> をタップして集めよう。<br/>
+          <b style="color:rgba(127,179,214,.95)">👦 男の子</b> をタップすると少し戻ってドキドキ…！
+        </div>
+      </div>
+      <div class="hud">
+        <div class="pill">進捗 <b id="score">0</b>/25</div>
+        <div class="pill"><span class="barWrap"><span class="bar" id="bar"></span></span></div>
+        <label class="pill toggle" title="効果音をON/OFF">
+          <input id="sound" type="checkbox" checked>
+          <span>音</span>
+        </label>
+      </div>
+    </header>
+
+    <div class="stage" id="stage" aria-label="game stage"></div>
+
+    <div class="footer">
+      <div class="hint">👆タップだけでOK（時間制限なし）<br/>クリアすると “封筒オープン演出” → 発表！</div>
+      <div style="display:flex; gap:10px;">
+        <button class="secondary" id="how" type="button">遊び方</button>
+        <button id="start" type="button">スタート</button>
+      </div>
+    </div>
+
+    <!-- Intro -->
+    <div class="overlay" id="intro">
+      <div class="modal">
+        <div style="font-size:28px;letter-spacing:.12em">👦 ✨ 👧 ✨ 👦</div>
+        <h2>性別はどっちかな？</h2>
+        <p><b>ゲームクリアで性別発表！</b><br/>女の子をタップして <b>25</b> まで集めよう。</p>
+        <p class="tiny">※スマホの仕様で、音は「スタート」を押した後に有効になります</p>
+        <div class="row">
+          <button class="secondary" id="introHow" type="button">遊び方</button>
+          <button id="introGo" type="button">スタート</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- How -->
+    <div class="overlay hidden" id="howOverlay">
+      <div class="modal">
+        <div style="font-size:28px;letter-spacing:.12em">👧 ✨ 👦 ✨ 👧</div>
+        <h2>あそびかた</h2>
+        <p>
+          ・👧 女の子：<b>+1</b><br/>
+          ・👦 男の子：<b>-2</b><br/>
+          ・25まで集めたらクリア！
+        </p>
+        <div class="row">
+          <button class="secondary" id="closeHow" type="button">戻る</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reveal stage -->
+    <div class="revealStage overlay hidden" id="revealStage" aria-hidden="true">
+      <div class="revealBox" id="revealBox">
+        <div class="shimmer"></div>
+        <div class="flash" id="flash"></div>
+        <div class="sakuras" id="sakuras"></div>
+
+        <div style="font-size:26px;letter-spacing:.12em">💌 🌸 💌 🌸 💌</div>
+        <h2 id="revealTitle">性別は…</h2>
+
+        <div class="envWrap" id="envWrap" aria-hidden="true">
+          <div class="env">
+            <div class="envBottom"></div>
+            <div class="flap"></div>
+            <div class="seal"></div>
+            <div class="letter" id="letter">Ready…</div>
+          </div>
+        </div>
+
+        <div class="countText" id="countText">3</div>
+        <div class="miniText" id="miniText">深呼吸…（ドキドキ）</div>
+
+        <div class="row revealButtons" id="revealButtons">
+          <button class="secondary" id="again" type="button">もう一回</button>
+          <button id="share" type="button">スクショしてLINEへ</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById("stage");
+  const scoreEl = document.getElementById("score");
+  const barEl = document.getElementById("bar");
+  const soundToggle = document.getElementById("sound");
+
+  const intro = document.getElementById("intro");
+  const howOverlay = document.getElementById("howOverlay");
+
+  const revealStage = document.getElementById("revealStage");
+  const revealTitle = document.getElementById("revealTitle");
+  const countText = document.getElementById("countText");
+  const miniText = document.getElementById("miniText");
+  const flash = document.getElementById("flash");
+  const sakuras = document.getElementById("sakuras");
+  const revealButtons = document.getElementById("revealButtons");
+  const revealBox = document.getElementById("revealBox");
+  const envWrap = document.getElementById("envWrap");
+  const letter = document.getElementById("letter");
+
+  const startBtn = document.getElementById("start");
+  const howBtn = document.getElementById("how");
+  const introGo = document.getElementById("introGo");
+  const introHow = document.getElementById("introHow");
+  const closeHow = document.getElementById("closeHow");
+  const againBtn = document.getElementById("again");
+  const shareBtn = document.getElementById("share");
+  const card = document.getElementById("card");
+
+  const TARGET = 25;
+  let score = 0;
+  let running = false;
+  let spawner = null;
+
+  // ---- Sound (WebAudio) ----
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!soundToggle.checked) return;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  }
+  function tone(freq=660, dur=0.06, type="sine", gain=0.06){
+    if (!soundToggle.checked) return;
+    ensureAudio();
+    if (!audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t0); o.stop(t0 + dur);
+  }
+  function chime(){
+    const notes = [784, 880, 990, 1180, 1320];
+    notes.forEach((f,i)=> setTimeout(()=>tone(f,0.09,"sine",0.05), i*85));
+  }
+  function bad(){
+    tone(190, 0.10, "triangle", 0.08);
+    setTimeout(()=>tone(140, 0.12, "sine", 0.05), 50);
+  }
+  function heartbeat(intensity=1){
+    const base = 110 + intensity*16;
+    tone(base, 0.10, "sine", 0.06);
+    setTimeout(()=>tone(base*1.25, 0.08, "sine", 0.05), 160);
+  }
+
+  function setScore(v){
+    score = Math.max(0, Math.min(TARGET, v));
+    scoreEl.textContent = score;
+    barEl.style.width = (score / TARGET * 100).toFixed(1) + "%";
+  }
+
+  function clearDrops(){
+    [...stage.querySelectorAll(".drop")].forEach(el => el.remove());
+  }
+
+  function spawnDrop(){
+    const kind = (Math.random() < 0.54) ? "girl" : "boy";
+    const el = document.createElement("div");
+    el.className = "drop " + kind;
+    el.dataset.kind = kind;
+
+    el.innerHTML = (kind === "girl")
+      ? "👧<span class='label'>GIRL</span>"
+      : "👦<span class='label'>BOY</span>";
+
+    const x = Math.floor(Math.random() * 86) + 7;
+    el.style.left = x + "%";
+
+    const base = 4.6;
+    const speed = base - (score / TARGET) * 1.6 + (Math.random()*0.9 - 0.45);
+    const dur = Math.max(2.3, speed);
+    el.style.animationDuration = dur + "s";
+
+    el.addEventListener("animationend", () => el.remove());
+    el.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!running) return;
+
+      const k = el.dataset.kind;
+      el.remove();
+
+      if (k === "girl") {
+        setScore(score + 1);
+        tone(740 + score*6, 0.06, "sine", 0.05);
+      } else {
+        setScore(score - 2);
+        bad();
+        card.classList.remove("shake");
+        void card.offsetWidth;
+        card.classList.add("shake");
+      }
+
+      if (score >= TARGET) win();
+    }, {passive:false});
+
+    stage.appendChild(el);
+  }
+
+  function startGame(){
+    ensureAudio();
+    tone(520, 0.10, "triangle", 0.07);
+
+    running = true;
+    intro.classList.add("hidden");
+    howOverlay.classList.add("hidden");
+
+    revealStage.classList.add("hidden");
+    revealStage.setAttribute("aria-hidden", "true");
+    revealBox.classList.remove("final");
+    envWrap.classList.remove("open");
+    letter.textContent = "Ready…";
+    letter.classList.remove("finalText");
+    countText.style.display = "block";
+    miniText.style.display = "block";
+    revealButtons.style.display = "none";
+
+    sakuras.innerHTML = "";
+    clearDrops();
+    setScore(0);
+
+    if (spawner) clearInterval(spawner);
+    spawner = setInterval(() => {
+      if (!running) return;
+      spawnDrop();
+      if (Math.random() < 0.22) spawnDrop();
+    }, 350);
+
+    for (let i=0;i<7;i++) setTimeout(spawnDrop, i*110);
+  }
+
+  function stopGame(){
+    running = false;
+    if (spawner) clearInterval(spawner);
+    spawner = null;
+  }
+
+  function petalBurst(durationMs=1600){
+    sakuras.innerHTML = "";
+    const start = performance.now();
+    const tick = () => {
+      const now = performance.now();
+      if (now - start > durationMs) return;
+      const p = document.createElement("div");
+      p.className = "pet";
+      p.textContent = "🌸";
+      p.style.left = (Math.random()*100) + "%";
+      p.style.animationDuration = (1.6 + Math.random()*1.1) + "s";
+      p.style.fontSize = (18 + Math.random()*18) + "px";
+      p.style.opacity = (0.65 + Math.random()*0.35).toFixed(2);
+      sakuras.appendChild(p);
+      setTimeout(()=>p.remove(), 3000);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  async function typewriter(el, text, speed=65){
+    el.innerHTML = ""; // clear
+    const span = document.createElement("span");
+    span.className = "typeLine";
+    el.appendChild(span);
+    for (let i=0;i<text.length;i++){
+      span.textContent = text.slice(0, i+1);
+      // subtle tick
+      tone(520 + (i%7)*25, 0.02, "sine", 0.025);
+      await new Promise(r => setTimeout(r, speed));
+    }
+    // stop caret after finish
+    span.style.borderRightColor = "transparent";
+  }
+
+  async function suspenseReveal(){
+    revealStage.classList.remove("hidden");
+    revealStage.setAttribute("aria-hidden", "false");
+
+    revealTitle.textContent = "性別は…";
+    miniText.textContent = "深呼吸…（ドキドキ）";
+    countText.textContent = "5";
+
+    petalBurst(1200);
+    envWrap.classList.remove("open");
+    letter.textContent = "Ready…";
+
+    // Countdown
+    const steps = [
+      {n:"5", msg:"……いくよ", hb:0.9},
+      {n:"4", msg:"ドキドキ…", hb:1.0},
+      {n:"3", msg:"あと少し…", hb:1.2},
+      {n:"2", msg:"もうすぐ…", hb:1.4},
+      {n:"1", msg:"発表します", hb:1.7},
+    ];
+
+    for (const s of steps){
+      countText.textContent = s.n;
+      miniText.textContent = s.msg;
+      heartbeat(s.hb);
+      tone(420 + (3-Number(s.n))*90, 0.07, "triangle", 0.05);
+      await new Promise(r => setTimeout(r, 900));
+    }
+
+    // Big suspense
+    countText.textContent = "";
+    miniText.textContent = "……";
+    heartbeat(1.9);
+    await new Promise(r => setTimeout(r, 650));
+
+    // Envelope opens
+    revealTitle.textContent = "封筒オープン…";
+    envWrap.classList.add("open");
+    tone(620, 0.10, "triangle", 0.06);
+    await new Promise(r => setTimeout(r, 820));
+
+    // Flash + bloom
+    flash.classList.remove("on");
+    void flash.offsetWidth;
+    flash.classList.add("on");
+    chime();
+    petalBurst(2300);
+
+    // Final card look + typewriter
+    revealBox.classList.add("final", "finalBG");
+    countText.style.display = "none";
+    miniText.style.display = "none";
+
+    letter.classList.add("finalText");
+    letter.style.fontSize = "46px";
+    letter.style.letterSpacing = ".06em";
+
+    await typewriter(letter, "女の子です", 72);
+
+    // Subtitle under envelope
+    revealTitle.textContent = "発表！";
+    const sub = document.createElement("div");
+    sub.className = "miniText";
+    sub.style.marginTop = "10px";
+    sub.textContent = "2026年6月予定（名前はまだ内緒🤫）";
+    // ensure not duplicated
+    const old = revealBox.querySelector(".miniText.finalSub");
+    if (old) old.remove();
+    sub.classList.add("finalSub");
+    revealBox.appendChild(sub);
+
+    revealButtons.style.display = "flex";
+  }
+
+  function win(){
+    stopGame();
+    setTimeout(() => suspenseReveal(), 260);
+  }
+
+  // Buttons
+  startBtn.addEventListener("click", startGame);
+  introGo.addEventListener("click", startGame);
+  againBtn.addEventListener("click", startGame);
+
+  howBtn.addEventListener("click", () => { howOverlay.classList.remove("hidden"); });
+  introHow.addEventListener("click", () => { howOverlay.classList.remove("hidden"); intro.classList.add("hidden"); });
+  closeHow.addEventListener("click", () => {
+    howOverlay.classList.add("hidden");
+    if (!running) intro.classList.remove("hidden");
+  });
+
+  shareBtn.addEventListener("click", () => alert("この画面をスクショして、LINEに送ってね🌸"));
+})();
+</script>
+</body>
+</html>
