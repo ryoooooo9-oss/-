@@ -562,7 +562,7 @@
     await new Promise(r => setTimeout(r, 650));
 
     // Envelope opens
-    revealTitle.textContent = "封筒オープン…";
+    revealTitle.textContent = "発表…！";
     envWrap.classList.add("open");
     tone(620, 0.10, "triangle", 0.06);
     await new Promise(r => setTimeout(r, 820));
@@ -590,7 +590,7 @@
     const sub = document.createElement("div");
     sub.className = "miniText";
     sub.style.marginTop = "10px";
-    sub.textContent = "2026年6月予定（名前はまだ内緒🤫）";
+    sub.textContent = "2026年5月予定（名前はまだ内緒🤫）";
     // ensure not duplicated
     const old = revealBox.querySelector(".miniText.finalSub");
     if (old) old.remove();
